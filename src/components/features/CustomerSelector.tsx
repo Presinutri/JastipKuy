@@ -86,8 +86,10 @@ export function CustomerSelector() {
                   </span>
                 )}
 
-                {/* Hover actions */}
-                <span className="hidden group-hover:flex items-center gap-0.5 ml-1">
+                {/* Hover / Active actions (Fixed for iOS Touch via active state) */}
+                <span className={`items-center gap-0.5 ml-1 ${
+                  c.id === activeCustomerId ? 'flex' : 'hidden md:group-hover:flex'
+                }`}>
                   <span
                     role="button"
                     className="p-0.5 rounded hover:bg-white/20 opacity-70 hover:opacity-100"
