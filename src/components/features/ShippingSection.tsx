@@ -114,7 +114,7 @@ export function ShippingSection() {
           <div className="space-y-2 pt-1">
             <label className="text-sm font-semibold">Ekspedisi (Kurir)</label>
             <div className="w-full">
-              <Select value={courier} onValueChange={setCourier}>
+              <Select value={courier} onValueChange={(val) => val && setCourier(val)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pilih Kurir" />
                 </SelectTrigger>

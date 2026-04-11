@@ -124,7 +124,7 @@ export function AddProductForm() {
         
         <div className="space-y-2">
           <Label htmlFor="currency">Mata Uang</Label>
-          <Select value={currency} onValueChange={setCurrency}>
+          <Select value={currency} onValueChange={(val) => val && setCurrency(val)}>
             <SelectTrigger>
               <SelectValue placeholder="Pilih Mata Uang" />
             </SelectTrigger>
