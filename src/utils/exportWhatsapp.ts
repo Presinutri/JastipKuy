@@ -82,6 +82,7 @@ export function generateMasterRows(customers: Customer[]): (string | number)[][]
         Math.round(item.feeAmount),
         Math.round(item.shippingPerItem),
         Math.round(item.totalItemCost),
+        'ACTIVE', // Column O: Status
       ]);
     });
   });

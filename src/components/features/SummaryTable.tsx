@@ -1,19 +1,44 @@
 import React from 'react';
-import { useJastipStore, useActiveCustomer } from '@/store/useJastipStore';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil, Loader2 } from 'lucide-react';
+import { EditItemModal } from './EditItemModal';
+import { useJastipStore, JastipItem, useActiveCustomer } from '@/store/useJastipStore';
+import { generateMasterRows } from '@/utils/exportWhatsapp';
 
 export function SummaryTable() {
   const { removeItem } = useJastipStore();
   const { items, name: customerName } = useActiveCustomer();
+  
+  const [editingItem, setEditingItem] = React.useState<JastipItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+
+  const handleRemove = async (id: string) => {
+    if (!confirm('Hapus item ini?')) return;
+    
+    setIsDeleting(id);
+    removeItem(id);
+    
+    // Auto sync delete to sheet (by updating rows)
+    const rows = generateMasterRows(useJastipStore.getState().customers);
+    try {
+      await fetch('/api/export-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows, deletedIds: [id] }),
+      });
+    } catch (err) {
+      console.error('Delete sync failed:', err);
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleEdit = (item: JastipItem) => {
+    setEditingItem(item);
+    setIsModalOpen(true);
+  };
 
   if (items.length === 0) {
     return (
@@ -66,19 +91,40 @@ export function SummaryTable() {
                 Rp {Math.round(item.totalItemCost).toLocaleString('id-ID')}
               </TableCell>
               <TableCell>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:bg-destructive/10"
-                  onClick={() => removeItem(item.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-primary hover:bg-primary/10"
+                    onClick={() => handleEdit(item)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={() => handleRemove(item.id)}
+                    disabled={isDeleting === item.id}
+                  >
+                    {isDeleting === item.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      
+      <EditItemModal 
+        item={editingItem} 
+        open={isModalOpen} 
+        onOpenChange={setIsModalOpen} 
+      />
     </div>
   );
 }

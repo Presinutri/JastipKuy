@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useJastipStore, useActiveCustomer, FeeType } from '@/store/useJastipStore';
 import { useCurrency } from '@/hooks/useCurrency';
+import { generateMasterRows } from '@/utils/exportWhatsapp';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,20 @@ export function AddProductForm() {
       feePercentage: feeType === 'percentage' ? parseFloat(feeValue) : 0,
       feeFixed: feeType === 'fixed' ? parseFloat(feeValue) : 0,
     });
+    
+    // Auto sync to sheet
+    (async () => {
+      try {
+        const rows = generateMasterRows(useJastipStore.getState().customers);
+        await fetch('/api/export-sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows }),
+        });
+      } catch (err) {
+        console.error('Add sync failed:', err);
+      }
+    })();
     
     // Reset form
     setName('');
