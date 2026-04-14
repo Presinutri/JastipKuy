@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Percent } from 'lucide-react';
+import { PlusCircle, Percent, Search, X, ChevronDown } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
 // Popular currencies shown at the top of the dropdown
 const POPULAR_CURRENCIES = ['SGD', 'MYR', 'THB', 'JPY', 'KRW', 'CNY', 'HKD', 'TWD', 'AUD', 'USD', 'EUR', 'GBP', 'IDR'];
@@ -18,27 +19,41 @@ export function AddProductForm() {
   const { convertToIDR, loading, rates } = useCurrency();
   
   const [name, setName] = useState('');
-  const [currency, setCurrency] = useState('SGD');
+  const [currency, setCurrency] = useState(''); // Default to empty
   const [originalPrice, setOriginalPrice] = useState('');
   const [weight, setWeight] = useState('');
-  const [qty, setQty] = useState('1'); // quantity field
+  const [qty, setQty] = useState('1');
+  
+  const [searchQuery, setSearchQuery] = useState(''); // For currency search
+  const [showDropdown, setShowDropdown] = useState(false);
   
   const [feeType, setFeeType] = useState<FeeType>('percentage');
-  const [feeValue, setFeeValue] = useState('25'); // 25% default
+  const [feeValue, setFeeValue] = useState('25');
   
-  const price = parseFloat(originalPrice);
+  const price = parseFloat(originalPrice.replace(/,/g, '.'));
   const quantity = parseInt(qty) || 1;
-  const projectedIDR = (!isNaN(price) && price > 0) ? convertToIDR(price * quantity, currency) : 0;
+  const projectedIDR = (!isNaN(price) && price > 0 && currency) ? convertToIDR(price * quantity, currency) : 0;
 
-  // Split currencies into popular + others from the live API data
-  const { popularCurrencies, otherCurrencies } = useMemo(() => {
+  // Filter currencies based on search
+  const { filteredPopular, filteredOthers } = useMemo(() => {
     const allCurrencies = Object.keys(rates).filter(c => c !== 'IDR');
-    const popular = POPULAR_CURRENCIES.filter(c => c !== 'IDR' && allCurrencies.includes(c));
+    const query = searchQuery.toUpperCase();
+    
+    const popular = POPULAR_CURRENCIES.filter(c => 
+      c !== 'IDR' && 
+      allCurrencies.includes(c) && 
+      (query === '' || c.includes(query))
+    );
+    
     const others = allCurrencies
-      .filter(c => !POPULAR_CURRENCIES.includes(c))
+      .filter(c => 
+        !POPULAR_CURRENCIES.includes(c) && 
+        (query === '' || c.includes(query))
+      )
       .sort();
-    return { popularCurrencies: popular, otherCurrencies: others };
-  }, [rates]);
+      
+    return { filteredPopular: popular, filteredOthers: others };
+  }, [rates, searchQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,29 +152,102 @@ export function AddProductForm() {
           </div>
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-2 relative">
           <Label htmlFor="currency">Mata Uang</Label>
-          <Select value={currency} onValueChange={(val) => val && setCurrency(val)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih Mata Uang" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectGroup>
-                <SelectLabel className="text-xs text-muted-foreground">Mata Uang Populer</SelectLabel>
-                {popularCurrencies.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectGroup>
-              {otherCurrencies.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="text-xs text-muted-foreground">Semua Mata Uang</SelectLabel>
-                  {otherCurrencies.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectGroup>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className={currency ? '' : 'text-muted-foreground'}>
+                {currency || 'Pilih Mata Uang'}
+              </span>
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </button>
+
+            <AnimatePresence>
+              {showDropdown && (
+                <>
+                  {/* Backdrop to close when clicking outside */}
+                  <div 
+                    className="fixed inset-0 z-40 bg-transparent" 
+                    onClick={() => setShowDropdown(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="absolute z-50 mt-2 w-full min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in outline-none"
+                  >
+                    <div className="flex items-center border-b px-3 py-2">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <input
+                        className="flex h-7 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Cari kode (Cth: USD)..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        autoFocus
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="ml-1 p-1 hover:bg-muted rounded-full">
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="max-h-64 overflow-y-auto p-1 custom-scrollbar">
+                      {filteredPopular.length > 0 && (
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Populer
+                        </div>
+                      )}
+                      {filteredPopular.map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setCurrency(c);
+                            setShowDropdown(false);
+                            setSearchQuery('');
+                          }}
+                          className={`relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${currency === c ? 'bg-accent/50 text-accent-foreground font-medium' : ''}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                      
+                      {filteredOthers.length > 0 && (
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2 border-t pt-2">
+                          Lainnya
+                        </div>
+                      )}
+                      {filteredOthers.map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setCurrency(c);
+                            setShowDropdown(false);
+                            setSearchQuery('');
+                          }}
+                          className={`relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${currency === c ? 'bg-accent/50 text-accent-foreground font-medium' : ''}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                      
+                      {filteredPopular.length === 0 && filteredOthers.length === 0 && (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          Tidak ada mata uang ditemukan.
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
               )}
-            </SelectContent>
-          </Select>
+            </AnimatePresence>
+          </div>
         </div>
         
         <div className="space-y-2">

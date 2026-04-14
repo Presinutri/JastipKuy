@@ -17,7 +17,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50/50 pb-36 font-sans text-foreground">
       {/* Header */}
       <header className="bg-primary text-primary-foreground py-6 shadow-md relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20 pointer-events-none"> 
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
         </div>
         <div className="container max-w-5xl mx-auto px-4 relative z-10">
           <h1 className="text-3xl font-black tracking-tight mb-1 flex items-center" style={{ fontFamily: 'var(--font-display)' }}>
