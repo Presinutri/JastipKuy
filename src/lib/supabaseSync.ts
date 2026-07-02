@@ -115,12 +115,12 @@ export async function loadAllData(): Promise<LoadedData | null> {
       return null;
     }
 
-    const sessionsData = sessionsRes.data ?? [];
+    const sessionsData = (sessionsRes.data ?? []) as any[];
     // Supabase is empty → caller will sync localStorage data up
     if (sessionsData.length === 0) return null;
 
-    const customersData = customersRes.data ?? [];
-    const itemsData = itemsRes.data ?? [];
+    const customersData = (customersRes.data ?? []) as any[];
+    const itemsData = (itemsRes.data ?? []) as any[];
 
     const sessions: JastipSession[] = sessionsData.map((s) => ({
       id: s.id as string,
