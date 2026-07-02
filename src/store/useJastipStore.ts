@@ -35,6 +35,7 @@ export interface CustomerShipping {
 export interface Customer {
   id: string;
   name: string;
+  isPaid?: boolean;
   items: JastipItem[];
   shipping: CustomerShipping;
 }
@@ -60,6 +61,7 @@ export const defaultShipping = (): CustomerShipping => ({
 export const createCustomer = (name: string): Customer => ({
   id: Math.random().toString(36).substring(2, 9),
   name,
+  isPaid: false,
   items: [],
   shipping: defaultShipping(),
 });
@@ -88,6 +90,7 @@ interface JastipState {
   addCustomer: (name: string) => void;
   removeCustomer: (id: string) => void;
   renameCustomer: (id: string, name: string) => void;
+  setCustomerPaidStatus: (id: string, isPaid: boolean) => void;
   setActiveCustomer: (id: string) => void;
 
   // Item actions (on active customer of active session)
@@ -249,6 +252,22 @@ export const useJastipStore = create<JastipState>()(
             sessions: updateActiveSession(state.sessions, state.activeSessionId, (session) => ({
               ...session,
               customers: session.customers.map((c) => (c.id === id ? { ...c, name } : c)),
+            })),
+          };
+        });
+      },
+
+      setCustomerPaidStatus: (id, isPaid) => {
+        set((state) => {
+          const activeSession = state.sessions.find((s) => s.id === state.activeSessionId);
+          const customer = activeSession?.customers.find((c) => c.id === id);
+          if (customer) {
+            supabaseSync.upsertCustomer({ ...customer, isPaid }, state.activeSessionId).catch(syncWarn);
+          }
+          return {
+            sessions: updateActiveSession(state.sessions, state.activeSessionId, (session) => ({
+              ...session,
+              customers: session.customers.map((c) => (c.id === id ? { ...c, isPaid } : c)),
             })),
           };
         });

@@ -105,7 +105,7 @@ export function generateMasterRows(customers: Customer[], sessionName?: string):
         Math.round(item.feeAmount),                    // M: Fee
         Math.round(item.shippingPerItem),              // N: Ongkir
         Math.round(item.totalItemCost),                // O: Subtotal
-        'ACTIVE',                                      // P: Status
+        customer.isPaid ? 'PAID' : 'UNPAID',           // P: Status
       ]);
     });
   });

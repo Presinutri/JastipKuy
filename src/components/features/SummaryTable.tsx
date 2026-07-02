@@ -9,8 +9,8 @@ import { MessageCircle, CloudUpload, CheckCircle } from 'lucide-react';
 import { useActiveSession } from '@/store/useJastipStore';
 
 export function SummaryTable() {
-  const { removeItem } = useJastipStore();
-  const { items, name: customerName, shipping } = useActiveCustomer();
+  const { removeItem, setCustomerPaidStatus } = useJastipStore();
+  const { items, name: customerName, shipping, id: customerId, isPaid } = useActiveCustomer();
   const activeSession = useActiveSession();
   
   const [editingItem, setEditingItem] = React.useState<JastipItem | null>(null);
@@ -211,7 +211,25 @@ export function SummaryTable() {
           </TableRow>
           <TableRow className="bg-muted/10 border-t">
             <TableCell colSpan={7} className="py-4">
-              <div className="flex flex-col sm:flex-row justify-end items-center gap-3">
+              <div className="flex flex-col items-end gap-3">
+                
+                <div className="flex items-center gap-2 mb-1 px-1">
+                  <input
+                    type="checkbox"
+                    id={`paid-status-${customerId}`}
+                    checked={isPaid || false}
+                    onChange={(e) => setCustomerPaidStatus(customerId, e.target.checked)}
+                    className="w-5 h-5 accent-green-600 cursor-pointer"
+                  />
+                  <label 
+                    htmlFor={`paid-status-${customerId}`} 
+                    className={`text-sm font-bold cursor-pointer select-none ${isPaid ? 'text-green-600' : 'text-muted-foreground'}`}
+                  >
+                    {isPaid ? '✅ LUNAS (Paid)' : 'BELUM LUNAS (Unpaid)'}
+                  </label>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-end items-center gap-3 w-full sm:w-auto">
                 <Button
                   onClick={handleSaveToSheets}
                   variant="outline"

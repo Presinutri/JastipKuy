@@ -41,6 +41,7 @@ export async function upsertCustomer(customer: Customer, sessionId: string): Pro
     id: customer.id,
     session_id: sessionId,
     name: customer.name,
+    is_paid: customer.isPaid ?? false,
     origin_id: customer.shipping.originId,
     origin_name: customer.shipping.originName,
     destination_id: customer.shipping.destinationId,
@@ -131,6 +132,7 @@ export async function loadAllData(): Promise<LoadedData | null> {
         .map((c) => ({
           id: c.id as string,
           name: c.name as string,
+          isPaid: c.is_paid as boolean,
           shipping: {
             originId: (c.origin_id as string) ?? '',
             originName: (c.origin_name as string) ?? '',
