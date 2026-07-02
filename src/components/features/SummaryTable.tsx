@@ -207,29 +207,27 @@ export function SummaryTable() {
             <TableCell className="text-right font-black text-base text-primary tracking-tight py-3">
               Rp {grandTotal.toLocaleString('id-ID')}
             </TableCell>
-            <TableCell />
+            <TableCell className="text-center align-middle">
+              <div className="flex flex-col items-center justify-center gap-1 mt-1">
+                <input
+                  type="checkbox"
+                  id={`paid-status-${customerId}`}
+                  checked={isPaid || false}
+                  onChange={(e) => setCustomerPaidStatus(customerId, e.target.checked)}
+                  className="w-4 h-4 accent-green-600 cursor-pointer"
+                />
+                <label 
+                  htmlFor={`paid-status-${customerId}`} 
+                  className={`text-[10px] font-bold cursor-pointer select-none leading-none tracking-wider ${isPaid ? 'text-green-600' : 'text-muted-foreground'}`}
+                >
+                  {isPaid ? 'PAID' : 'UNPAID'}
+                </label>
+              </div>
+            </TableCell>
           </TableRow>
           <TableRow className="bg-muted/10 border-t">
             <TableCell colSpan={7} className="py-4">
-              <div className="flex flex-col items-end gap-3">
-                
-                <div className="flex items-center gap-2 mb-1 px-1">
-                  <input
-                    type="checkbox"
-                    id={`paid-status-${customerId}`}
-                    checked={isPaid || false}
-                    onChange={(e) => setCustomerPaidStatus(customerId, e.target.checked)}
-                    className="w-5 h-5 accent-green-600 cursor-pointer"
-                  />
-                  <label 
-                    htmlFor={`paid-status-${customerId}`} 
-                    className={`text-sm font-bold cursor-pointer select-none ${isPaid ? 'text-green-600' : 'text-muted-foreground'}`}
-                  >
-                    {isPaid ? '✅ LUNAS (Paid)' : 'BELUM LUNAS (Unpaid)'}
-                  </label>
-                </div>
-
-                <div className="flex flex-col sm:flex-row justify-end items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row justify-end items-center gap-3 w-full">
                 <Button
                   onClick={handleSaveToSheets}
                   variant="outline"
