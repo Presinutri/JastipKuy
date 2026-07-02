@@ -125,12 +125,19 @@ const updateActiveCustomer = (
   activeSessionId: string,
   updater: (customer: Customer) => Customer
 ): JastipSession[] =>
-  updateActiveSession(sessions, activeSessionId, (session) => ({
-    ...session,
-    customers: session.customers.map((c) =>
-      c.id === session.activeCustomerId ? updater(c) : c
-    ),
-  }));
+  updateActiveSession(sessions, activeSessionId, (session) => {
+    const validActiveCustomerId = session.customers.some((c) => c.id === session.activeCustomerId)
+      ? session.activeCustomerId
+      : session.customers[0]?.id;
+
+    return {
+      ...session,
+      activeCustomerId: validActiveCustomerId,
+      customers: session.customers.map((c) =>
+        c.id === validActiveCustomerId ? updater(c) : c
+      ),
+    };
+  });
 
 /** Helper: log Supabase error dengan pesan yang readable (bukan `{}`) */
 const syncWarn = (e: unknown) => {
