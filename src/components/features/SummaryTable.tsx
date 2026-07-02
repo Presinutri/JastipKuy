@@ -255,7 +255,6 @@ export function SummaryTable() {
                   WA {customerName}
                 </Button>
               </div>
-            </div>
           </TableCell>
         </TableRow>
         </TableFooter>
