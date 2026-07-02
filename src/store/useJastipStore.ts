@@ -403,14 +403,15 @@ export const useJastipStore = create<JastipState>()(
 
 export const useActiveSession = () => {
   const { sessions, activeSessionId } = useJastipStore();
-  return sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
+  return sessions.find((s) => s.id === activeSessionId) ?? sessions[0] ?? createSession('JASTIP Fallback');
 };
 
 export const useActiveCustomer = () => {
   const session = useActiveSession();
   return (
-    session.customers.find((c) => c.id === session.activeCustomerId) ??
-    session.customers[0]
+    session?.customers?.find((c) => c.id === session.activeCustomerId) ??
+    session?.customers?.[0] ??
+    createCustomer('Customer 1')
   );
 };
 
