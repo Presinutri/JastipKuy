@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useJastipStore } from '@/store/useJastipStore';
+import { useJastipStore, useActiveSession } from '@/store/useJastipStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, X, User, Pencil, Check } from 'lucide-react';
 
 export function CustomerSelector() {
-  const { customers, activeCustomerId, addCustomer, removeCustomer, renameCustomer, setActiveCustomer } = useJastipStore();
+  const { addCustomer, removeCustomer, renameCustomer, setActiveCustomer } = useJastipStore();
+  const activeSession = useActiveSession();
+  const customers = activeSession.customers;
+  const activeCustomerId = activeSession.activeCustomerId;
 
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');

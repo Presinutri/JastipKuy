@@ -4,7 +4,7 @@ import { useShipping } from '@/hooks/useShipping';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck } from 'lucide-react';
+import { Truck, X } from 'lucide-react';
 import { LocationSelect } from '@/components/features/LocationSelect';
 
 export function ShippingSection() {
@@ -70,6 +70,24 @@ export function ShippingSection() {
           updateItem(item.id, { shippingPerItem: cost * ratio });
         });
       }
+    }
+  };
+
+  const handleClearShipping = () => {
+    if (!confirm('Hapus ongkir untuk customer ini?')) return;
+    
+    updateShipping({
+      totalShippingCost: 0,
+      originId: '',
+      destinationId: '',
+      originName: '',
+      destinationName: ''
+    });
+
+    if (items.length > 0) {
+      items.forEach((item) => {
+        updateItem(item.id, { shippingPerItem: 0 });
+      });
     }
   };
 
@@ -142,13 +160,28 @@ export function ShippingSection() {
               Rp {shipping.totalShippingCost.toLocaleString('id-ID')}
             </p>
           </div>
-          <Button
-            onClick={handleCalculate}
-            disabled={loading || items.length === 0 || !originId || !destinationId}
-            variant="default"
-          >
-            {loading ? 'Menghitung...' : 'Cek Ongkir'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {shipping.totalShippingCost > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/20 hover:bg-destructive/10 h-10 px-3"
+                onClick={handleClearShipping}
+                title="Hapus Ongkir"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Hapus
+              </Button>
+            )}
+            <Button
+              onClick={handleCalculate}
+              disabled={loading || items.length === 0 || !originId || !destinationId}
+              variant="default"
+              className="h-10"
+            >
+              {loading ? 'Menghitung...' : 'Cek Ongkir'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

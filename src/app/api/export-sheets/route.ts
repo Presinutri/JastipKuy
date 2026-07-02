@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     // 1. Ambil data yang sudah ada (untuk mengecek ID)
     const getRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Sheet1!A:O', // Mengambil Kolom A sampai O (15 Kolom)
+      range: 'Sheet1!A:P', // Kolom A sampai P (16 Kolom: +1 kolom Sesi Jastip)
     });
 
     const currentRows = getRes.data.values || [];
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       if (id && idToRowNumber.has(id)) {
         const rowNumber = idToRowNumber.get(id);
         updateData.push({
-          range: `Sheet1!A${rowNumber}:O${rowNumber}`,
+          range: `Sheet1!A${rowNumber}:P${rowNumber}`,
           values: [row],
         });
       } else if (id) {
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       if (idToRowNumber.has(cleanId)) {
         const rowNumber = idToRowNumber.get(cleanId);
         updateData.push({
-          range: `Sheet1!O${rowNumber}`, // Update cuma kolom O
+          range: `Sheet1!P${rowNumber}`, // Update cuma kolom P (Status)
           values: [['DELETED']],
         });
       }
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
     if (rowsToAppend.length > 0) {
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'Sheet1!A:O',
+        range: 'Sheet1!A:P',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: rowsToAppend,

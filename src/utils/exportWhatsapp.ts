@@ -1,4 +1,4 @@
-import { JastipItem, Customer } from '@/store/useJastipStore';
+import { JastipItem, Customer, JastipSession } from '@/store/useJastipStore';
 
 const formatRp = (amount: number) => `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
 
@@ -9,14 +9,15 @@ interface ExportData {
   destinationName?: string;
   courier?: string;
   customerName?: string;
+  sessionName?: string; // nama sesi jastip, contoh: "JASTIP PENANG"
 }
 
 /**
  * Export for CUSTOMER via WhatsApp.
  * Shows: Item name, original price, subtotal in IDR.
- * Also shows total weight and total shipping.
+ * Also shows total weight, total shipping, and session name.
  */
-export function exportToWhatsapp({ items, shippingCost, totalWeight, destinationName, courier, customerName }: ExportData) {
+export function exportToWhatsapp({ items, shippingCost, totalWeight, destinationName, courier, customerName, sessionName }: ExportData) {
   const date = new Date().toLocaleDateString('id-ID', {
     weekday: 'long',
     year: 'numeric',
@@ -24,30 +25,34 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
     day: 'numeric',
   });
 
-  const grandTotal = items.reduce((acc, item) => acc + item.totalItemCost, 0);
+  // Jumlahkan nilai yang sudah di-round per item agar konsisten dengan tabel rekapitulasi
+  const grandTotal = items.reduce((acc, item) => acc + Math.round(item.totalItemCost), 0);
 
-  let text = `🛍️ *REKAP BELANJA JASTIP*\n`;
+  let text = `✈️ *${sessionName || 'REKAP BELANJA JASTIP'}*\n`;
+  text += `🛍️ *REKAP BELANJA*\n`;
   if (customerName) text += `👤 ${customerName}\n`;
   text += `📅 ${date}\n`;
   text += `──────────────────────\n\n`;
 
   items.forEach((item, index) => {
-    text += `*${index + 1}. ${item.name}*\n`;
-    text += `   Harga: ${item.currency} ${item.originalPrice.toLocaleString('id-ID')}\n`;
-    text += `   *Subtotal: ${formatRp(item.totalItemCost)}*\n\n`;
+    const qty = item.qty ?? 1;
+    text += `*${index + 1}. ${item.name}*${qty > 1 ? ` (${qty}x)` : ''}\n`;
+    text += `   Harga: ${formatRp(Math.round(item.totalItemCost))}${qty > 1 ? ` _(${formatRp(Math.round(item.totalItemCost / qty))}/item)_` : ''}\n\n`;
   });
 
   text += `──────────────────────\n`;
-  text += `📊 *RINGKASAN TAGIHAN*\n`;
+  text += `📊 *RINGKASAN BELANJA*\n`;
   text += `──────────────────────\n`;
   text += `📦 Total Item: ${items.length} barang\n`;
   text += `⚖️ Total Berat: ${totalWeight} gram (${(totalWeight / 1000).toFixed(2)} Kg)\n`;
   if (shippingCost > 0) {
     const courierInfo = courier ? ` (${courier.toUpperCase()})` : '';
     const destInfo = destinationName ? ` → ${destinationName}` : '';
-    text += `🚚 Ongkir${courierInfo}${destInfo}: ${formatRp(shippingCost)}\n`;
+    // Gunakan Math.round agar ongkir yang tampil di WA sama dengan di tabel
+    text += `🚚 Ongkir${courierInfo}${destInfo}: ${formatRp(Math.round(shippingCost))}\n`;
   }
-  text += `\n💳 *TOTAL TAGIHAN: ${formatRp(grandTotal)}*\n\n`;
+  // grandTotal sudah hasil penjumlahan nilai yang di-round, cukup toLocaleString tanpa Math.round ulang
+  text += `\n💳 *TOTAL BELANJA: Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
   text += `_Terima kasih telah belanja melalui JastipKuy! 🙏_`;
 
   const encodedText = encodeURIComponent(text);
@@ -57,8 +62,24 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
 /**
  * Generate Master Rows for Google Sheets API.
  * Shows all orders across all customers in a flat table layout.
+ * Column A: Item ID
+ * Column B: Tanggal
+ * Column C: Sesi Jastip (NEW)
+ * Column D: Customer
+ * Column E: Tujuan
+ * Column F: Kurir
+ * Column G: Nama Barang
+ * Column H: Qty
+ * Column I: Harga Asli
+ * Column J: Mata Uang
+ * Column K: Harga IDR
+ * Column L: Berat
+ * Column M: Fee
+ * Column N: Ongkir
+ * Column O: Subtotal
+ * Column P: Status
  */
-export function generateMasterRows(customers: Customer[]): (string | number)[][] {
+export function generateMasterRows(customers: Customer[], sessionName?: string): (string | number)[][] {
   const date = new Date().toLocaleDateString('id-ID');
   
   const rows: (string | number)[][] = [];
@@ -68,21 +89,22 @@ export function generateMasterRows(customers: Customer[]): (string | number)[][]
 
     customer.items.forEach(item => {
       rows.push([
-        item.id, // Column A: Item ID
-        date,
-        customer.name,
-        customer.shipping.destinationName || '',
-        (customer.shipping.courier || '').toUpperCase(),
-        item.name,
-        item.qty || 1,
-        item.originalPrice,
-        item.currency,
-        Math.round(item.idrPrice),
-        item.weight,
-        Math.round(item.feeAmount),
-        Math.round(item.shippingPerItem),
-        Math.round(item.totalItemCost),
-        'ACTIVE', // Column O: Status
+        item.id,                                       // A: Item ID
+        date,                                          // B: Tanggal
+        sessionName || '',                             // C: Sesi Jastip (BARU)
+        customer.name,                                 // D: Customer
+        customer.shipping.destinationName || '',        // E: Tujuan
+        (customer.shipping.courier || '').toUpperCase(), // F: Kurir
+        item.name,                                     // G: Nama Barang
+        item.qty || 1,                                 // H: Qty
+        item.originalPrice,                            // I: Harga Asli
+        item.currency,                                 // J: Mata Uang
+        Math.round(item.idrPrice),                     // K: Harga IDR
+        item.weight,                                   // L: Berat
+        Math.round(item.feeAmount),                    // M: Fee
+        Math.round(item.shippingPerItem),              // N: Ongkir
+        Math.round(item.totalItemCost),                // O: Subtotal
+        'ACTIVE',                                      // P: Status
       ]);
     });
   });
@@ -90,3 +112,14 @@ export function generateMasterRows(customers: Customer[]): (string | number)[][]
   return rows;
 }
 
+/**
+ * Generate rows from ALL sessions, including session name in each row.
+ */
+export function generateMasterRowsFromSessions(sessions: JastipSession[]): (string | number)[][] {
+  const rows: (string | number)[][] = [];
+  sessions.forEach(session => {
+    const sessionRows = generateMasterRows(session.customers, session.name);
+    rows.push(...sessionRows);
+  });
+  return rows;
+}

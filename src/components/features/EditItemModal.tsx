@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, Percent, Loader2 } from 'lucide-react';
-import { generateMasterRows } from '@/utils/exportWhatsapp';
+import { generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
 
 interface EditItemModalProps {
   item: JastipItem | null;
@@ -49,7 +49,14 @@ export function EditItemModal({ item, open, onOpenChange }: EditItemModalProps) 
       setWeight(perItemWeight.toString());
       setQty((item.qty || 1).toString());
       setFeeType(item.feeType);
-      setFeeValue(item.feeType === 'percentage' ? item.feePercentage.toString() : item.feeFixed.toString());
+      if (item.feeType === 'fixed') {
+        const modalPerItem = item.idrPrice / (item.qty || 1);
+        const feePerItem = item.feeFixed / (item.qty || 1);
+        const hargaJualPerItem = modalPerItem + feePerItem;
+        setFeeValue(Math.round(hargaJualPerItem).toString());
+      } else {
+        setFeeValue(item.feePercentage.toString());
+      }
     }
   }, [item, open]);
 
@@ -66,11 +73,31 @@ export function EditItemModal({ item, open, onOpenChange }: EditItemModalProps) 
     return { popularCurrencies: popular, otherCurrencies: others };
   }, [rates]);
 
+  // Helper to suggest a nice rounded selling price
+  const suggestHargaJual = (modal: number) => {
+    if (modal <= 0) return 0;
+    let step = 5000;
+    if (modal >= 3000000) step = 100000;
+    else if (modal >= 1000000) step = 50000;
+    else if (modal >= 200000) step = 25000;
+    else if (modal >= 50000) step = 10000;
+    return Math.floor(modal / step + 1) * step;
+  };
+
   const handleSave = async () => {
     if (!item || !name || !originalPrice || !weight) return;
 
     const totalOriginalPrice = parseFloat(originalPrice) * quantityNum;
     const idrPrice = convertToIDR(totalOriginalPrice, currency);
+    
+    // Calculate fee if type is fixed (Harga Jual)
+    let finalFeeFixed = 0;
+    if (feeType === 'fixed') {
+      const hargaJualPerItem = parseFloat(feeValue) || 0;
+      const modalPerItem = convertToIDR(parseFloat(originalPrice), currency);
+      const feePerItem = hargaJualPerItem - modalPerItem;
+      finalFeeFixed = feePerItem * quantityNum;
+    }
     
     // Update local store
     updateItem(item.id, {
@@ -82,7 +109,7 @@ export function EditItemModal({ item, open, onOpenChange }: EditItemModalProps) 
       weight: parseFloat(weight) * quantityNum,
       feeType,
       feePercentage: feeType === 'percentage' ? parseFloat(feeValue) : 0,
-      feeFixed: feeType === 'fixed' ? parseFloat(feeValue) : 0,
+      feeFixed: finalFeeFixed,
     });
 
     onOpenChange(false);
@@ -95,7 +122,9 @@ export function EditItemModal({ item, open, onOpenChange }: EditItemModalProps) 
       // Actually, standard way is to trigger the sync after a small delay or use the updated values.
       // For now, let's trigger it. The store will have updated by the time the fetch starts.
       
-      const rows = generateMasterRows(useJastipStore.getState().customers);
+      const state = useJastipStore.getState();
+      const allCustomers = state.sessions.flatMap((s) => s.customers);
+      const rows = generateMasterRowsFromSessions(state.sessions);
       await fetch('/api/export-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,16 +222,22 @@ export function EditItemModal({ item, open, onOpenChange }: EditItemModalProps) 
                 variant={feeType === 'fixed' ? 'default' : 'outline'}
                 size="sm"
                 className="flex-1"
-                onClick={() => setFeeType('fixed')}
+                onClick={() => {
+                  setFeeType('fixed');
+                  if (feeType !== 'fixed') {
+                    const modal = convertToIDR(parseFloat(originalPrice || '0'), currency);
+                    setFeeValue(modal > 0 ? suggestHargaJual(modal).toString() : '100000');
+                  }
+                }}
               >
-                Rp Fixed
+                Harga Jual
               </Button>
             </div>
             <Input 
               type="number"
               value={feeValue} 
               onChange={(e) => setFeeValue(e.target.value)} 
-              placeholder={feeType === 'percentage' ? 'Persentase (%)' : 'Harga Tetap (Rp)'}
+              placeholder={feeType === 'percentage' ? 'Persentase (%)' : 'Harga Jual (Rp / item)'}
             />
           </div>
 

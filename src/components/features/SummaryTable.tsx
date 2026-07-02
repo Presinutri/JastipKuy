@@ -1,14 +1,14 @@
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Trash2, Pencil, Loader2 } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { useJastipStore, JastipItem, useActiveCustomer } from '@/store/useJastipStore';
-import { generateMasterRows } from '@/utils/exportWhatsapp';
+import { generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
 
 export function SummaryTable() {
   const { removeItem } = useJastipStore();
-  const { items, name: customerName } = useActiveCustomer();
+  const { items, name: customerName, shipping } = useActiveCustomer();
   
   const [editingItem, setEditingItem] = React.useState<JastipItem | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -21,7 +21,8 @@ export function SummaryTable() {
     removeItem(id);
     
     // Auto sync delete to sheet (by updating rows)
-    const rows = generateMasterRows(useJastipStore.getState().customers);
+    const state = useJastipStore.getState();
+    const rows = generateMasterRowsFromSessions(state.sessions);
     try {
       await fetch('/api/export-sheets', {
         method: 'POST',
@@ -48,6 +49,14 @@ export function SummaryTable() {
     );
   }
 
+  // ── Kalkulasi footer ──────────────────────────────────────────────────────
+  const totalModal = items.reduce((acc, item) => acc + Math.round(item.idrPrice), 0);
+  const totalFee   = items.reduce((acc, item) => acc + Math.round(item.feeAmount), 0);
+  const subtotalItems = totalModal + totalFee;
+  const ongkir     = Math.round(shipping.totalShippingCost);
+  const grandTotal  = subtotalItems + ongkir;
+  const courierLabel = shipping.courier ? shipping.courier.toUpperCase() : '';
+
   return (
     <div className="border rounded-xl bg-card overflow-x-auto shadow-sm">
       <Table>
@@ -55,9 +64,9 @@ export function SummaryTable() {
           <TableRow>
             <TableHead>Nama Barang</TableHead>
             <TableHead className="text-center w-[60px]">Qty</TableHead>
+            <TableHead className="text-right w-[90px]">Berat</TableHead>
             <TableHead className="text-right">Modal</TableHead>
             <TableHead className="text-right">Fee</TableHead>
-            <TableHead className="text-right">Ongkir</TableHead>
             <TableHead className="text-right font-bold">Subtotal</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
@@ -68,7 +77,7 @@ export function SummaryTable() {
               <TableCell className="font-medium">
                 <div>{item.name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {item.currency} {(item.originalPrice / (item.qty || 1)).toLocaleString('id-ID')} / item &middot; {item.weight}gr
+                  {item.currency} {(item.originalPrice / (item.qty || 1)).toLocaleString('id-ID')} / item &middot; {Math.round(item.weight / (item.qty || 1))}gr/item
                 </div>
               </TableCell>
               <TableCell className="text-center">
@@ -76,19 +85,19 @@ export function SummaryTable() {
                   {item.qty ?? 1}
                 </span>
               </TableCell>
+              {/* Berat total sudah termasuk qty (item.weight = qty × berat/item) */}
+              <TableCell className="text-right text-muted-foreground text-sm tracking-tight">
+                {item.weight.toLocaleString('id-ID')} gr
+              </TableCell>
               <TableCell className="text-right tracking-tight">
                 Rp {Math.round(item.idrPrice).toLocaleString('id-ID')}
               </TableCell>
               <TableCell className="text-right text-green-600 tracking-tight">
                 + Rp {Math.round(item.feeAmount).toLocaleString('id-ID')}
               </TableCell>
-              <TableCell className="text-right text-orange-500 tracking-tight">
-                {item.shippingPerItem > 0
-                  ? `+ Rp ${Math.round(item.shippingPerItem).toLocaleString('id-ID')}`
-                  : '-'}
-              </TableCell>
+              {/* Subtotal per item = modal + fee (ongkir ditampilkan di footer) */}
               <TableCell className="text-right font-bold text-primary tracking-tight">
-                Rp {Math.round(item.totalItemCost).toLocaleString('id-ID')}
+                Rp {(Math.round(item.idrPrice) + Math.round(item.feeAmount)).toLocaleString('id-ID')}
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
@@ -118,6 +127,41 @@ export function SummaryTable() {
             </TableRow>
           ))}
         </TableBody>
+
+        {/* ── Footer: Ongkir + Grand Total ─────────────────────────────── */}
+        <TableFooter>
+          {ongkir > 0 && (
+            <TableRow className="border-t border-dashed bg-orange-50/50 dark:bg-orange-900/10">
+              <TableCell colSpan={5} className="text-right text-sm text-orange-600 font-medium py-2 leading-relaxed">
+                🚚 <span className="font-semibold">{courierLabel || 'Ongkir'}</span>
+                {shipping.originName && shipping.destinationName && (
+                  <span className="text-orange-500/80">
+                    {' '}· dari <span className="font-semibold">{shipping.originName}</span>
+                    {' '}→ <span className="font-semibold">{shipping.destinationName}</span>
+                  </span>
+                )}
+                {shipping.totalWeight > 0 && (
+                  <span className="text-orange-500/80">
+                    {' '}· {(shipping.totalWeight / 1000).toFixed(2)} Kg
+                  </span>
+                )}
+              </TableCell>
+              <TableCell className="text-right text-sm text-orange-600 font-semibold tracking-tight py-2">
+                + Rp {ongkir.toLocaleString('id-ID')}
+              </TableCell>
+              <TableCell />
+            </TableRow>
+          )}
+          <TableRow className="border-t-2 bg-primary/5">
+            <TableCell colSpan={5} className="text-right font-bold text-base py-3">
+              💳 Grand Total
+            </TableCell>
+            <TableCell className="text-right font-black text-base text-primary tracking-tight py-3">
+              Rp {grandTotal.toLocaleString('id-ID')}
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        </TableFooter>
       </Table>
       
       <EditItemModal 

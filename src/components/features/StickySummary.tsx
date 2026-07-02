@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { useJastipStore, useActiveCustomer } from '@/store/useJastipStore';
-import { exportToWhatsapp, generateMasterRows } from '@/utils/exportWhatsapp';
+import { useJastipStore, useActiveCustomer, useActiveSession } from '@/store/useJastipStore';
+import { exportToWhatsapp, generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, ShoppingBag, TrendingUp, CloudUpload, CheckCircle, Loader2 } from 'lucide-react';
 
 export function StickySummary() {
-  const { customers } = useJastipStore();
+  const { sessions } = useJastipStore();
+  const activeSession = useActiveSession();
   const activeCustomer = useActiveCustomer();
   const { items, shipping, name: customerName } = activeCustomer;
+  const sessionName = activeSession.name;
 
   const totalModal = items.reduce((acc, item) => acc + item.idrPrice, 0);
   const totalFee = items.reduce((acc, item) => acc + item.feeAmount, 0);
@@ -21,6 +23,7 @@ export function StickySummary() {
     destinationName: shipping.destinationName,
     courier: shipping.courier,
     customerName,
+    sessionName,
   };
 
   const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +35,7 @@ export function StickySummary() {
   };
 
   const handleSaveToSheets = async () => {
-    const rows = generateMasterRows(customers);
+    const rows = generateMasterRowsFromSessions(sessions);
     if (rows.length === 0) return;
 
     setIsSaving(true);
@@ -58,8 +61,11 @@ export function StickySummary() {
     }
   };
 
-  // Only show if there's any item across all customers
-  const totalAllItems = customers.reduce((acc, c) => acc + c.items.length, 0);
+  // Only show if there's any item across all sessions
+  const totalAllItems = sessions.reduce(
+    (acc, s) => acc + s.customers.reduce((a, c) => a + c.items.length, 0),
+    0
+  );
   if (totalAllItems === 0) return null;
 
   return (
@@ -67,12 +73,17 @@ export function StickySummary() {
       <div className="container max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
 
         <div className="flex flex-wrap gap-4 md:gap-6 w-full md:w-auto">
-          {/* Customer label */}
-          <div className="flex items-center gap-1.5 self-center">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide truncate max-w-[100px]">
-              {customerName}
+          {/* Session + Customer label */}
+          <div className="flex flex-col self-center">
+            <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest leading-none mb-0.5">
+              {sessionName}
             </span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide truncate max-w-[100px]">
+                {customerName}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

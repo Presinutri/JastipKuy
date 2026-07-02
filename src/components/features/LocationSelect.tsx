@@ -18,6 +18,13 @@ export function LocationSelect({ label, initialValue, onLocationChange }: Locati
   const [showResults, setShowResults] = useState(false);
   const [selected, setSelected] = useState<LocationItem | null>(initialValue ? { value: '', text: initialValue } : null);
 
+  React.useEffect(() => {
+    if (initialValue !== undefined) {
+      setQuery(initialValue);
+      setSelected(initialValue ? { value: '', text: initialValue } : null);
+    }
+  }, [initialValue]);
+
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSearch = (text: string) => {

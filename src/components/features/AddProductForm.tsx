@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useJastipStore, useActiveCustomer, FeeType } from '@/store/useJastipStore';
 import { useCurrency } from '@/hooks/useCurrency';
-import { generateMasterRows } from '@/utils/exportWhatsapp';
+import { generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,9 @@ export function AddProductForm() {
   const [feeType, setFeeType] = useState<FeeType>('percentage');
   const [feeValue, setFeeValue] = useState('25');
   
-  const price = parseFloat(originalPrice.replace(/,/g, '.'));
+  // Normalize comma → dot for decimal parsing (supports both 29,8 and 29.8)
+  const normalizePrice = (val: string) => val.replace(/,/g, '.');
+  const price = parseFloat(normalizePrice(originalPrice));
   const quantity = parseInt(qty) || 1;
   const projectedIDR = (!isNaN(price) && price > 0 && currency) ? convertToIDR(price * quantity, currency) : 0;
 
@@ -55,14 +57,35 @@ export function AddProductForm() {
     return { filteredPopular: popular, filteredOthers: others };
   }, [rates, searchQuery]);
 
+  // Helper to suggest a nice rounded selling price
+  const suggestHargaJual = (modal: number) => {
+    if (modal <= 0) return 0;
+    let step = 5000;
+    if (modal >= 3000000) step = 100000;
+    else if (modal >= 1000000) step = 50000;
+    else if (modal >= 200000) step = 25000;
+    else if (modal >= 50000) step = 10000;
+    // Always round up to the next step to ensure a positive fee
+    return Math.floor(modal / step + 1) * step;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !originalPrice || !weight) return;
     
-    // Multiply by qty to get total price per row
-    const totalOriginalPrice = parseFloat(originalPrice) * quantity;
+    // Multiply by qty to get total price per row (normalize comma → dot)
+    const totalOriginalPrice = parseFloat(normalizePrice(originalPrice)) * quantity;
     const idrPrice = convertToIDR(totalOriginalPrice, currency);
     
+    // feeValue represents Harga Jual per item if feeType === 'fixed'
+    let finalFeeFixed = 0;
+    if (feeType === 'fixed') {
+      const hargaJualPerItem = parseFloat(feeValue) || 0;
+      const modalPerItem = convertToIDR(parseFloat(normalizePrice(originalPrice)), currency);
+      const feePerItem = hargaJualPerItem - modalPerItem;
+      finalFeeFixed = feePerItem * quantity;
+    }
+
     addItem({
       name,
       qty: quantity,
@@ -72,13 +95,14 @@ export function AddProductForm() {
       weight: parseFloat(weight) * quantity,
       feeType,
       feePercentage: feeType === 'percentage' ? parseFloat(feeValue) : 0,
-      feeFixed: feeType === 'fixed' ? parseFloat(feeValue) : 0,
+      feeFixed: finalFeeFixed,
     });
     
     // Auto sync to sheet
     (async () => {
       try {
-        const rows = generateMasterRows(useJastipStore.getState().customers);
+        const state = useJastipStore.getState();
+        const rows = generateMasterRowsFromSessions(state.sessions);
         await fetch('/api/export-sheets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -253,25 +277,36 @@ export function AddProductForm() {
         <div className="space-y-2">
           <Label htmlFor="price">Harga Asli (per item)</Label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground text-sm">
-              {currency === 'IDR' ? 'Rp' : currency}
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground text-sm font-medium">
+              {currency === 'IDR' ? 'Rp' : (currency || '?')}
             </div>
-            <Input 
-              id="price" 
-              type="number"
-              min="0"
+            <Input
+              id="price"
+              type="text"
+              inputMode="decimal"
               className="pl-14"
-              placeholder="0" 
-              value={originalPrice} 
-              onChange={(e) => setOriginalPrice(e.target.value)} 
+              placeholder="Cth: 29.8 atau 29,8"
+              value={originalPrice}
+              onChange={(e) => {
+                // Allow digits, dot, and comma only
+                const val = e.target.value.replace(/[^0-9.,]/g, '');
+                setOriginalPrice(val);
+              }}
               required
             />
           </div>
-          {currency !== 'IDR' && projectedIDR > 0 && (
-             <p className="text-xs text-muted-foreground mt-1">
-               {quantity > 1 ? `${quantity} item × ${currency} ${price.toLocaleString('id-ID')} = ` : ''}~ Rp {Math.round(projectedIDR).toLocaleString('id-ID')}
-             </p>
-          )}
+          {/* Conversion hint — shown whenever there's a valid price */}
+          {projectedIDR > 0 && currency && currency !== 'IDR' ? (
+            <p className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1 mt-1 inline-flex items-center gap-1">
+              <span>≈</span>
+              {quantity > 1
+                ? <span>{quantity} item × {currency} {price.toLocaleString('id-ID')} = <strong>Rp {Math.round(projectedIDR).toLocaleString('id-ID')}</strong></span>
+                : <span>Rp <strong>{Math.round(projectedIDR).toLocaleString('id-ID')}</strong></span>
+              }
+            </p>
+          ) : originalPrice && isNaN(price) ? (
+            <p className="text-xs text-destructive mt-1">Format tidak valid. Gunakan titik atau koma untuk desimal.</p>
+          ) : null}
         </div>
       </div>
 
@@ -297,18 +332,19 @@ export function AddProductForm() {
               size="sm"
               onClick={() => {
                 setFeeType('fixed');
-                setFeeValue('50000');
+                const modal = convertToIDR(parseFloat(normalizePrice(originalPrice || '0')), currency);
+                setFeeValue(modal > 0 ? suggestHargaJual(modal).toString() : '100000');
               }}
               className="px-3"
             >
-              Rp Fixed
+              Harga Jual
             </Button>
           </div>
         </div>
         
         <div className="flex-1 w-full">
           <Label htmlFor="feeValue" className="mb-2 block">
-            {feeType === 'percentage' ? 'Persentase Fee (%)' : 'Manual Fee (Rp)'}
+            {feeType === 'percentage' ? 'Persentase Fee (%)' : 'Harga Jual (Rp / item)'}
           </Label>
           <Input 
             id="feeValue" 
