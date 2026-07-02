@@ -4,15 +4,63 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Pencil, Loader2 } from 'lucide-react';
 import { EditItemModal } from './EditItemModal';
 import { useJastipStore, JastipItem, useActiveCustomer } from '@/store/useJastipStore';
-import { generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
+import { generateMasterRowsFromSessions, exportToWhatsapp } from '@/utils/exportWhatsapp';
+import { MessageCircle, CloudUpload, CheckCircle } from 'lucide-react';
+import { useActiveSession } from '@/store/useJastipStore';
 
 export function SummaryTable() {
   const { removeItem } = useJastipStore();
   const { items, name: customerName, shipping } = useActiveCustomer();
+  const activeSession = useActiveSession();
   
   const [editingItem, setEditingItem] = React.useState<JastipItem | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+
+  const handleExportWA = () => {
+    if (items.length === 0) return;
+    const totalWeight = items.reduce((acc, item) => acc + item.weight, 0);
+    exportToWhatsapp({
+      items,
+      shippingCost: shipping.totalShippingCost,
+      totalWeight,
+      destinationName: shipping.destinationName,
+      courier: shipping.courier,
+      customerName,
+      sessionName: activeSession.name,
+    });
+  };
+
+  const handleSaveToSheets = async () => {
+    const state = useJastipStore.getState();
+    const rows = generateMasterRowsFromSessions(state.sessions);
+    if (rows.length === 0) return;
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      const res = await fetch('/api/export-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Server error');
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`Gagal menyimpan: ${message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleRemove = async (id: string) => {
     if (!confirm('Hapus item ini?')) return;
@@ -160,6 +208,38 @@ export function SummaryTable() {
               Rp {grandTotal.toLocaleString('id-ID')}
             </TableCell>
             <TableCell />
+          </TableRow>
+          <TableRow className="bg-muted/10 border-t">
+            <TableCell colSpan={7} className="py-4">
+              <div className="flex flex-col sm:flex-row justify-end items-center gap-3">
+                <Button
+                  onClick={handleSaveToSheets}
+                  variant="outline"
+                  className={`w-full sm:w-auto font-semibold transition-all border-primary/30 ${
+                    saveSuccess ? 'bg-green-500/10 text-green-700 border-green-500/50' : 'hover:bg-primary/5 hover:border-primary'
+                  }`}
+                  disabled={items.length === 0 || isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 mr-2 text-primary animate-spin" />
+                  ) : saveSuccess ? (
+                    <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                  ) : (
+                    <CloudUpload className="w-4 h-4 mr-2 text-primary" />
+                  )}
+                  {isSaving ? 'Menyimpan...' : saveSuccess ? 'Tersimpan!' : 'Simpan ke Sheet'}
+                </Button>
+
+                <Button
+                  onClick={handleExportWA}
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold"
+                  disabled={items.length === 0}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WA {customerName}
+                </Button>
+              </div>
+            </TableCell>
           </TableRow>
         </TableFooter>
       </Table>
