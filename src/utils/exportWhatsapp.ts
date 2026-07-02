@@ -53,6 +53,7 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
   }
   // grandTotal sudah hasil penjumlahan nilai yang di-round, cukup toLocaleString tanpa Math.round ulang
   text += `\n💳 *TOTAL BELANJA: Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
+  text += `🏧 *Payment ke BCA 0840969711 (a.n. Karenina Priyanka)*\n\n`;
   text += `_Terima kasih telah belanja melalui JastipKuy! 🙏_`;
 
   const encodedText = encodeURIComponent(text);
