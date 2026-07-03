@@ -25,8 +25,10 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
     day: 'numeric',
   });
 
-  // Jumlahkan nilai yang sudah di-round per item agar konsisten dengan tabel rekapitulasi
-  const grandTotal = items.reduce((acc, item) => acc + Math.round(item.totalItemCost), 0);
+  // Hitung subtotal barang (Modal + Fee), sesuai dengan tabel rekapitulasi
+  const subtotalItems = items.reduce((acc, item) => acc + Math.round(item.idrPrice) + Math.round(item.feeAmount), 0);
+  const ongkir = Math.round(shippingCost);
+  const grandTotal = subtotalItems + ongkir;
 
   let text = `✈️ *${sessionName || 'REKAP BELANJA JASTIP'}*\n`;
   text += `🛍️ *REKAP BELANJA*\n`;
@@ -36,8 +38,9 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
 
   items.forEach((item, index) => {
     const qty = item.qty ?? 1;
+    const itemSubtotal = Math.round(item.idrPrice) + Math.round(item.feeAmount);
     text += `*${index + 1}. ${item.name}*${qty > 1 ? ` (${qty}x)` : ''}\n`;
-    text += `   Harga: ${formatRp(Math.round(item.totalItemCost))}${qty > 1 ? ` _(${formatRp(Math.round(item.totalItemCost / qty))}/item)_` : ''}\n\n`;
+    text += `   Harga: ${formatRp(itemSubtotal)}${qty > 1 ? ` _(${formatRp(Math.round(itemSubtotal / qty))}/item)_` : ''}\n\n`;
   });
 
   text += `──────────────────────\n`;
@@ -45,11 +48,10 @@ export function exportToWhatsapp({ items, shippingCost, totalWeight, destination
   text += `──────────────────────\n`;
   text += `📦 Total Item: ${items.length} barang\n`;
   text += `⚖️ Total Berat: ${totalWeight} gram (${(totalWeight / 1000).toFixed(2)} Kg)\n`;
-  if (shippingCost > 0) {
+  if (ongkir > 0) {
     const courierInfo = courier ? ` (${courier.toUpperCase()})` : '';
     const destInfo = destinationName ? ` → ${destinationName}` : '';
-    // Gunakan Math.round agar ongkir yang tampil di WA sama dengan di tabel
-    text += `🚚 Ongkir${courierInfo}${destInfo}: ${formatRp(Math.round(shippingCost))}\n`;
+    text += `🚚 Ongkir${courierInfo}${destInfo}: ${formatRp(ongkir)}\n`;
   }
   // grandTotal sudah hasil penjumlahan nilai yang di-round, cukup toLocaleString tanpa Math.round ulang
   text += `\n💳 *TOTAL BELANJA: Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
@@ -104,7 +106,7 @@ export function generateMasterRows(customers: Customer[], sessionName?: string):
         item.weight,                                   // L: Berat
         Math.round(item.feeAmount),                    // M: Fee
         Math.round(item.shippingPerItem),              // N: Ongkir
-        Math.round(item.totalItemCost),                // O: Subtotal
+        Math.round(item.idrPrice) + Math.round(item.feeAmount), // O: Subtotal
         customer.isPaid ? 'PAID' : 'UNPAID',           // P: Status
       ]);
     });

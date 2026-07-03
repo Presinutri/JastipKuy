@@ -181,10 +181,9 @@ export function SummaryTable() {
           {ongkir > 0 && (
             <TableRow className="border-t border-dashed bg-orange-50/50 dark:bg-orange-900/10">
               <TableCell colSpan={5} className="text-right text-sm text-orange-600 font-medium py-2 leading-relaxed">
-                🚚 <span className="font-semibold">{courierLabel || 'Ongkir'}</span>
-                {shipping.originName && shipping.destinationName && (
+                🚚 <span className="font-semibold">Ongkir {courierLabel ? `(${courierLabel})` : ''}</span>
+                {shipping.destinationName && (
                   <span className="text-orange-500/80">
-                    {' '}· dari <span className="font-semibold">{shipping.originName}</span>
                     {' '}→ <span className="font-semibold">{shipping.destinationName}</span>
                   </span>
                 )}
