@@ -64,7 +64,14 @@ export function StickySummary() {
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Total Profit Sesi</p>
+              <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider flex items-center">
+                Total Profit Sesi
+                {totalModal > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700">
+                    {((totalFee / totalModal) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </p>
               <p className="text-base font-bold text-green-600">Rp {totalFee.toLocaleString('id-ID')}</p>
             </div>
           </div>
