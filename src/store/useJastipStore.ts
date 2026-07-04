@@ -45,6 +45,7 @@ export interface JastipSession {
   name: string;
   customers: Customer[];
   activeCustomerId: string;
+  createdAt?: string;
 }
 
 export const defaultShipping = (): CustomerShipping => ({
@@ -73,6 +74,7 @@ export const createSession = (name: string): JastipSession => {
     name,
     customers: [firstCustomer],
     activeCustomerId: firstCustomer.id,
+    createdAt: new Date().toISOString(),
   };
 };
 

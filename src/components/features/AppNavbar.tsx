@@ -3,14 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calculator, Package, Home } from 'lucide-react';
+import { Calculator, Package, Home, FileSpreadsheet, TrendingUp } from 'lucide-react';
 import { useSupabaseInit } from '@/hooks/useSupabaseInit';
 import { Loader2, Cloud, CloudOff } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/kalkulator', label: 'Kalkulator Jastip', icon: Calculator },
-  { href: '/master-barang', label: 'Master Barang', icon: Package },
+  { label: 'Home', href: '/', icon: Home },
+  { label: 'Kalkulator Jastip', href: '/kalkulator', icon: Calculator },
+  { label: 'Master Barang', href: '/master-barang', icon: Package },
+  { label: 'Report', href: '/report', icon: FileSpreadsheet },
+  { label: 'Dashboard', href: '/dashboard', icon: TrendingUp },
 ];
 
 export function AppNavbar() {

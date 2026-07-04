@@ -67,6 +67,7 @@ export async function upsertSession(session: JastipSession): Promise<void> {
     id: session.id,
     name: session.name,
     active_customer_id: session.activeCustomerId,
+    created_at: session.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
@@ -127,6 +128,7 @@ export async function loadAllData(): Promise<LoadedData | null> {
       id: s.id as string,
       name: s.name as string,
       activeCustomerId: s.active_customer_id as string,
+      createdAt: s.created_at as string,
       customers: customersData
         .filter((c) => c.session_id === s.id)
         .map((c) => ({

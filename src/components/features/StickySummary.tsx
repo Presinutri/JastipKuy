@@ -1,32 +1,36 @@
-import React, { useState } from 'react';
-import { useJastipStore, useActiveCustomer, useActiveSession } from '@/store/useJastipStore';
-import { exportToWhatsapp, generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
-import { Button } from '@/components/ui/button';
-import { MessageCircle, ShoppingBag, TrendingUp, CloudUpload, CheckCircle, Loader2 } from 'lucide-react';
+import { useJastipStore, useActiveSession } from '@/store/useJastipStore';
+import { ShoppingBag, TrendingUp, Wallet } from 'lucide-react';
 
 export function StickySummary() {
   const { sessions } = useJastipStore();
   const activeSession = useActiveSession();
-  const sessionCustomers = activeSession.customers || [];
-  const sessionName = activeSession.name;
+  const sessionCustomers = activeSession?.customers ?? [];
+  const sessionName = activeSession?.name ?? '';
 
-  const totalModal = sessionCustomers.reduce((acc, c) => 
-    acc + c.items.reduce((sum, item) => sum + Math.round(item.idrPrice), 0)
-  , 0);
-  
-  const totalFee = sessionCustomers.reduce((acc, c) => 
-    acc + c.items.reduce((sum, item) => sum + Math.round(item.feeAmount), 0)
-  , 0);
-  
-  const grandTotal = sessionCustomers.reduce((acc, c) => {
-    const itemsTotal = c.items.reduce((sum, item) => sum + Math.round(item.idrPrice) + Math.round(item.feeAmount), 0);
-    const shippingTotal = Math.round(c.shipping.totalShippingCost || 0);
-    return acc + itemsTotal + shippingTotal;
-  }, 0);
+  const totalModal = Math.round(
+    sessionCustomers.reduce((acc, c) =>
+      acc + (c.items ?? []).reduce((sum, item) => sum + item.idrPrice, 0)
+    , 0)
+  );
 
-  // Only show if there's any item across all sessions
+  const totalFee = Math.round(
+    sessionCustomers.reduce((acc, c) =>
+      acc + (c.items ?? []).reduce((sum, item) => sum + item.feeAmount, 0)
+    , 0)
+  );
+
+  const grandTotal = Math.round(
+    sessionCustomers.reduce((acc, c) => {
+      const itemsTotal = (c.items ?? []).reduce(
+        (sum, item) => sum + item.idrPrice + item.feeAmount, 0
+      );
+      const shippingTotal = c.shipping?.totalShippingCost ?? 0;
+      return acc + itemsTotal + shippingTotal;
+    }, 0)
+  );
+
   const totalAllItems = sessions.reduce(
-    (acc, s) => acc + s.customers.reduce((a, c) => a + c.items.length, 0),
+    (acc, s) => acc + (s.customers ?? []).reduce((a, c) => a + (c.items?.length ?? 0), 0),
     0
   );
   if (totalAllItems === 0) return null;
@@ -34,9 +38,7 @@ export function StickySummary() {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-lg border-t shadow-[0_-10px_40px_rgba(0,0,0,0.12)] z-50">
       <div className="container max-w-5xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
-
         <div className="flex flex-wrap gap-4 md:gap-8 w-full">
-          {/* Session label */}
           <div className="flex flex-col self-center">
             <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest leading-none mb-1">
               Sesi Aktif
@@ -67,8 +69,11 @@ export function StickySummary() {
               <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider flex items-center">
                 Total Profit Sesi
                 {totalModal > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700">
-                    {((totalFee / totalModal) * 100).toFixed(1)}%
+                  <span
+                    className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black bg-green-100 text-green-700"
+                    title="Markup: profit dibagi modal"
+                  >
+                    {((totalFee / totalModal) * 100).toFixed(1)}% markup
                   </span>
                 )}
               </p>
@@ -78,7 +83,7 @@ export function StickySummary() {
 
           <div className="flex items-center gap-3 md:ml-auto">
             <div className="p-2.5 bg-secondary/20 rounded-full">
-              <span className="text-xl">💰</span>
+              <Wallet className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Grand Total Sesi</p>
@@ -86,7 +91,6 @@ export function StickySummary() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
