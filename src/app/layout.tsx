@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { AppNavbar } from "@/components/features/AppNavbar";
 
 // Body font: Plus Jakarta Sans — modern, clean, very popular for Gen Z web apps
 const plusJakarta = Plus_Jakarta_Sans({
@@ -32,7 +33,10 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${spaceGrotesk.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>{children}</body>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <AppNavbar />
+        {children}
+      </body>
     </html>
   );
 }

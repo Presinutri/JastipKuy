@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useJastipStore, useActiveCustomer, FeeType } from '@/store/useJastipStore';
 import { useCurrency } from '@/hooks/useCurrency';
 import { generateMasterRowsFromSessions } from '@/utils/exportWhatsapp';
+import { useBarangMasterStore, BarangMaster } from '@/store/useBarangMasterStore';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Percent, Search, X, ChevronDown } from 'lucide-react';
+import { PlusCircle, Percent, Search, X, ChevronDown, Clock, Package } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 
 // Popular currencies shown at the top of the dropdown
 const POPULAR_CURRENCIES = ['SGD', 'MYR', 'THB', 'JPY', 'KRW', 'CNY', 'HKD', 'TWD', 'AUD', 'USD', 'EUR', 'GBP', 'IDR'];
@@ -29,6 +31,88 @@ export function AddProductForm() {
   
   const [feeType, setFeeType] = useState<FeeType>('percentage');
   const [feeValue, setFeeValue] = useState('25');
+
+  // ── Master Barang Search ──────────────────────────────────────────────────
+  const { searchBarang, updateHargaFromPesanan, loaded: masterLoaded, loadFromSupabase: loadMaster } = useBarangMasterStore();
+  const [masterResults, setMasterResults] = useState<BarangMaster[]>([]);
+  const [showMasterDropdown, setShowMasterDropdown] = useState(false);
+  const [selectedMaster, setSelectedMaster] = useState<BarangMaster | null>(null);
+  const [hargaAgeText, setHargaAgeText] = useState<string | null>(null);
+  const masterDropdownRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load master on mount
+  useEffect(() => {
+    if (!masterLoaded) loadMaster();
+  }, [masterLoaded, loadMaster]);
+
+  // Close master dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (masterDropdownRef.current && !masterDropdownRef.current.contains(e.target as Node)) {
+        setShowMasterDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Debounced search
+  const handleNameChange = useCallback((value: string) => {
+    setName(value);
+    setSelectedMaster(null);
+    setHargaAgeText(null);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length >= 2) {
+      debounceRef.current = setTimeout(() => {
+        const results = searchBarang(value);
+        setMasterResults(results);
+        setShowMasterDropdown(results.length > 0);
+      }, 300);
+    } else {
+      setMasterResults([]);
+      setShowMasterDropdown(false);
+    }
+  }, [searchBarang]);
+
+  // Auto-fill from selected master item
+  const handleSelectMaster = useCallback((item: BarangMaster) => {
+    setName(item.namaBarang);
+    setSelectedMaster(item);
+    setShowMasterDropdown(false);
+    setMasterResults([]);
+
+    // Auto-fill weight
+    if (item.beratDefault) {
+      setWeight(item.beratDefault.toString());
+    }
+    // Auto-fill currency
+    if (item.mataUang) {
+      setCurrency(item.mataUang.toUpperCase());
+    }
+    // Auto-fill harga asli
+    if (item.hargaAsli !== null) {
+      setOriginalPrice(item.hargaAsli.toString());
+    }
+    // Auto-fill harga jual if feeType is fixed
+    if (item.hargaJual !== null) {
+      setFeeType('fixed');
+      setFeeValue(item.hargaJual.toString());
+    }
+
+    // Set harga age indicator
+    if (item.hargaUpdatedAt) {
+      const date = new Date(item.hargaUpdatedAt);
+      const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) setHargaAgeText('Diupdate hari ini');
+      else if (diffDays === 1) setHargaAgeText('Diupdate kemarin');
+      else setHargaAgeText(`Diupdate ${diffDays} hari lalu`);
+    } else {
+      setHargaAgeText('Belum ada histori harga');
+    }
+  }, []);
   
   // Normalize comma → dot for decimal parsing (supports both 29,8 and 29.8)
   const normalizePrice = (val: string) => val.replace(/,/g, '.');
@@ -97,6 +181,17 @@ export function AddProductForm() {
       feePercentage: feeType === 'percentage' ? parseFloat(feeValue) : 0,
       feeFixed: finalFeeFixed,
     });
+
+    // Write-through: update harga di master barang jika item berasal dari master
+    if (selectedMaster) {
+      const hargaJualVal = feeType === 'fixed' ? parseFloat(feeValue) || null : null;
+      updateHargaFromPesanan(
+        name,
+        parseFloat(normalizePrice(originalPrice)) || null,
+        currency || null,
+        hargaJualVal
+      );
+    }
     
     // Auto sync to sheet
     (async () => {
@@ -118,6 +213,8 @@ export function AddProductForm() {
     setOriginalPrice('');
     setWeight('');
     setQty('1');
+    setSelectedMaster(null);
+    setHargaAgeText(null);
     // Keep currency and fee pref
   };
 
@@ -133,15 +230,84 @@ export function AddProductForm() {
         Menambah untuk: <span className="text-primary font-bold">{activeCustomer.name}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+        <div className="space-y-2" ref={masterDropdownRef}>
           <Label htmlFor="name">Nama Barang</Label>
-          <Input 
-            id="name" 
-            placeholder="Contoh: Popmart Labubu" 
-            value={name} 
-            onChange={(e) => setName(e.target.value)} 
-            required
-          />
+          <div className="relative">
+            <Input 
+              id="name" 
+              placeholder="Contoh: Popmart Labubu" 
+              value={name} 
+              onChange={(e) => handleNameChange(e.target.value)} 
+              onFocus={() => {
+                if (name.trim().length >= 2) {
+                  const results = searchBarang(name);
+                  setMasterResults(results);
+                  setShowMasterDropdown(results.length > 0);
+                }
+              }}
+              required
+              autoComplete="off"
+            />
+            {/* Master Barang Search Results Dropdown */}
+            <AnimatePresence>
+              {showMasterDropdown && masterResults.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg overflow-hidden"
+                >
+                  <div className="px-3 py-1.5 bg-muted/50 border-b">
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1">
+                      <Package className="w-3 h-3" /> Hasil dari Master Barang
+                    </p>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {masterResults.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleSelectMaster(item)}
+                        className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b border-border/30 last:border-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{item.namaBarang}</span>
+                          {item.kategori && (
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                              {item.kategori}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground">
+                          {item.beratDefault && <span>{item.beratDefault}gr</span>}
+                          {item.mataUang && item.hargaAsli !== null && (
+                            <span>{item.mataUang} {item.hargaAsli}</span>
+                          )}
+                          {item.hargaJual !== null && (
+                            <span className="text-green-600">Rp {Math.round(item.hargaJual).toLocaleString('id-ID')}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* No results message */}
+            {name.trim().length >= 2 && !showMasterDropdown && masterResults.length === 0 && !selectedMaster && masterLoaded && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                Barang tidak ditemukan di master. Lanjut ketik manual, atau{' '}
+                <Link href="/master-barang" className="text-primary hover:underline font-medium">
+                  tambahkan lewat Master Barang
+                </Link>.
+              </p>
+            )}
+            {selectedMaster && (
+              <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                ✓ Auto-fill dari Master Barang
+              </p>
+            )}
+          </div>
         </div>
         
         <div className="grid grid-cols-3 gap-2">
@@ -307,6 +473,13 @@ export function AddProductForm() {
           ) : originalPrice && isNaN(price) ? (
             <p className="text-xs text-destructive mt-1">Format tidak valid. Gunakan titik atau koma untuk desimal.</p>
           ) : null}
+          {/* Harga age indicator from master */}
+          {hargaAgeText && (
+            <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {hargaAgeText}
+            </p>
+          )}
         </div>
       </div>
 
