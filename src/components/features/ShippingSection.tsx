@@ -32,22 +32,19 @@ export function ShippingSection() {
 
     const costResponse = await calculateRates(originId, destinationId, totalWeightStr, courier);
 
-    interface CourierItem { courier_code: string; courier_name: string; price: number; }
+    interface RajaOngkirService { name: string; code: string; service: string; cost: number; }
     let cost = 0;
-    if (costResponse?.is_success && costResponse.data?.couriers?.length > 0) {
-      const match = costResponse.data.couriers.find((item: CourierItem) => {
-        const code = (item.courier_code || '').toLowerCase();
-        const name = (item.courier_name || '').toLowerCase();
-        const c = courier.toLowerCase();
-        return code.includes(c) || name.includes(c);
-      }) as CourierItem | undefined;
+    if (costResponse?.meta?.status === 'success' && Array.isArray(costResponse.data) && costResponse.data.length > 0) {
+      const services = costResponse.data as RajaOngkirService[];
+      const courierServices = services.filter(s => s.code.toLowerCase() === courier.toLowerCase());
 
-      if (match) {
-        cost = match.price;
+      if (courierServices.length > 0) {
+        // Try to pick a regular service first, fallback to the first available service
+        const regService = courierServices.find(s => ['reg', 'ez', 'ctc', 'regular'].includes(s.service.toLowerCase()));
+        cost = regService ? regService.cost : courierServices[0].cost;
       } else {
-        const first = costResponse.data.couriers[0] as CourierItem;
-        cost = first.price;
-        console.warn(`Courier ${courier} not found, choosing ${first.courier_name} as fallback.`);
+        cost = services[0].cost;
+        console.warn(`Courier ${courier} exact match not found, choosing ${services[0].name} fallback.`);
       }
     } else {
       alert('Gagal menghitung ongkir. Rute mungkin tidak didukung atau berat melebihi batas.');

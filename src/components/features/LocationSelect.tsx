@@ -63,7 +63,7 @@ export function LocationSelect({ label, initialValue, onLocationChange }: Locati
       
       <div className="relative group">
         <Input 
-          placeholder="Cari Kelurahan (Cth: Ancol)" 
+          placeholder="Cari Kecamatan/Kota (Cth: Grogol)" 
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowResults(true); }}

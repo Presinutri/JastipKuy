@@ -8,27 +8,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Search query must be at least 3 characters' }, { status: 400 });
   }
 
-  // Use the api.co.id key (stored in BINDERBYTE_API_KEY)
-  const apiKey = process.env.BINDERBYTE_API_KEY;
+  // Use the RajaOngkir API key
+  const apiKey = process.env.RAJAONGKIR_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json({ error: 'Api.co.id key missing' }, { status: 500 });
+    return NextResponse.json({ error: 'RajaOngkir API key missing' }, { status: 500 });
   }
 
   try {
-    // New endpoint for api.co.id village search
-    const apiUrl = `https://use.api.co.id/regional/indonesia/villages?search=${encodeURIComponent(q)}`;
+    const apiUrl = `https://rajaongkir.komerce.id/api/v1/destination/domestic-destination?search=${encodeURIComponent(q)}&limit=20&offset=0`;
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'x-api-co-id': apiKey
+        'key': apiKey
       }
     });
 
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(errData.message || `Failed to fetch villages: ${response.statusText}`);
+      throw new Error(errData.meta?.message || `Failed to fetch locations: ${response.statusText}`);
     }
 
     const data = await response.json();

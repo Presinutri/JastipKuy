@@ -2,39 +2,44 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const origin_village_code = searchParams.get('origin');
-  const destination_village_code = searchParams.get('destination');
+  const origin = searchParams.get('origin');
+  const destination = searchParams.get('destination');
   const weightInGrams = searchParams.get('weight');
+  const courier = searchParams.get('courier') || 'jne';
   
-  if (!origin_village_code || !destination_village_code || !weightInGrams) {
+  if (!origin || !destination || !weightInGrams) {
     return NextResponse.json({ error: 'Missing origin, destination, or weight' }, { status: 400 });
   }
 
-  // Use the api.co.id key (stored in BINDERBYTE_API_KEY based on user history)
-  const apiKey = process.env.BINDERBYTE_API_KEY;
+  const apiKey = process.env.RAJAONGKIR_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json({ error: 'Api.co.id key missing' }, { status: 500 });
+    return NextResponse.json({ error: 'RajaOngkir API key missing' }, { status: 500 });
   }
 
   try {
-    // API.co.id expects weight in KG
-    const weightInKg = Math.max(0.1, parseFloat(weightInGrams) / 1000);
+    const apiUrl = `https://rajaongkir.komerce.id/api/v1/calculate/domestic-cost`;
     
-    // Exact endpoint from documentation
-    const apiUrl = `https://use.api.co.id/expedition/shipping-cost?origin_village_code=${origin_village_code}&destination_village_code=${destination_village_code}&weight=${weightInKg}`;
+    // RajaOngkir expects form data
+    const formData = new URLSearchParams();
+    formData.append('origin', origin);
+    formData.append('destination', destination);
+    formData.append('weight', weightInGrams);
+    formData.append('courier', courier);
     
     const response = await fetch(apiUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'x-api-co-id': apiKey
-      }
+        'key': apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.message || 'Failed to fetch shipping cost' }, { status: response.status });
+      return NextResponse.json({ error: data.meta?.message || 'Failed to fetch shipping cost' }, { status: response.status });
     }
 
     return NextResponse.json(data);

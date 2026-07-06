@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 
 export interface LocationItem {
-  value: string; // village code 10 digits
-  text: string;  // formatted name (Village, District, City)
+  value: string; // destination ID
+  text: string;  // formatted name (label from API)
 }
 
 export function useWilayah() {
@@ -20,12 +20,12 @@ export function useWilayah() {
       
       if (data.error) throw new Error(data.error);
       
-      // Expected API.co.id Response: { is_success: true, data: [ { code: "...", name: "...", district: "...", regency: "..." } ] }
-      if (data && data.is_success && data.data) {
-        interface VillageItem { code: string; name: string; district: string; regency: string; }
-        return data.data.map((item: VillageItem) => ({
-          value: item.code,
-          text: `${item.name}, ${item.district}, ${item.regency}`
+      // Expected RajaOngkir V2 Response: { meta: { status: 'success' }, data: [ { id: 123, label: "..." } ] }
+      if (data && data.meta?.status === 'success' && Array.isArray(data.data)) {
+        interface RajaOngkirItem { id: number; label: string; }
+        return data.data.map((item: RajaOngkirItem) => ({
+          value: item.id.toString(),
+          text: item.label
         }));
       }
       return [];
